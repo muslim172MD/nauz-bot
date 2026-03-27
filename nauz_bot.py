@@ -32,9 +32,9 @@ import anthropic
 # ══════════════════════════════════════════════
 #  НАСТРОЙКИ — вставьте ваши токены здесь
 # ══════════════════════════════════════════════
-TELEGRAM_TOKEN    = "ВАШ_TELEGRAM_TOKEN_ЗДЕСЬ"
-ANTHROPIC_API_KEY = "ВАШ_ANTHROPIC_API_KEY_ЗДЕСЬ"
-
+import os
+TELEGRAM_TOKEN    = os.environ.get("TELEGRAM_TOKEN")
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
 # ══════════════════════════════════════════════
 #  Логирование
 # ══════════════════════════════════════════════
