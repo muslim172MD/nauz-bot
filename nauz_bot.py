@@ -15,8 +15,13 @@ from telegram.ext import (
     ConversationHandler,
 )
 
+import bitrix24
+
 TELEGRAM_TOKEN    = os.environ.get("TELEGRAM_TOKEN")
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
+ADMIN_USER_IDS = {
+    int(uid) for uid in os.environ.get("ADMIN_USER_IDS", "").split(",") if uid.strip().isdigit()
+}
 
 logging.basicConfig(
     format="%(asctime)s | %(name)s | %(levelname)s | %(message)s",
@@ -161,6 +166,48 @@ async def restart(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     return await start(update, context)
 
 
+def _default_month_ranges():
+    year = datetime.date.today().year
+    return [
+        (f"Июнь {year}", f"{year}-06-01", f"{year}-06-30"),
+        (f"Июль {year}", f"{year}-07-01", f"{year}-07-31"),
+    ]
+
+
+async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user = update.effective_user
+    if ADMIN_USER_IDS and user.id not in ADMIN_USER_IDS:
+        await update.message.reply_text("Эта команда доступна только администраторам.")
+        return
+
+    if not os.environ.get("BITRIX24_WEBHOOK_URL"):
+        await update.message.reply_text("Bitrix24 не подключён: не задан BITRIX24_WEBHOOK_URL.")
+        return
+
+    entity_kind = "leads"
+    if context.args and context.args[0].lower() in ("leads", "deals"):
+        entity_kind = context.args[0].lower()
+
+    await update.message.reply_text("Собираю статистику из Bitrix24...")
+    await update.message.chat.send_action("typing")
+
+    month_ranges = _default_month_ranges()
+    date_from, date_to = month_ranges[0][1], month_ranges[-1][2]
+
+    try:
+        if entity_kind == "deals":
+            items = bitrix24.get_deals(date_from, date_to)
+        else:
+            items = bitrix24.get_leads(date_from, date_to)
+        report_text = bitrix24.build_report(entity_kind, items, month_ranges)
+    except Exception as e:
+        logger.error(f"Bitrix24 stats error: {e}")
+        await update.message.reply_text(f"Ошибка получения статистики из Bitrix24: {e}")
+        return
+
+    await update.message.reply_text(report_text)
+
+
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     logger.error(f"Ошибка: {context.error}", exc_info=context.error)
 
@@ -168,6 +215,7 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
 def main() -> None:
     logger.info("Запуск бота НАУЗ...")
     app = Application.builder().token(TELEGRAM_TOKEN).build()
+    app.add_handler(CommandHandler("stats", stats_command))
     conv = ConversationHandler(
         entry_points=[CommandHandler("start", start)],
         states={
