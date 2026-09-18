@@ -87,6 +87,7 @@ SYSTEM_PROMPT = """Ты — интеллектуальный ассистент 
 """
 
 _PATIENT_DATA_PATTERNS = [
+    # Явные медицинские/идентификационные маркеры.
     re.compile(r"\bснилс\b", re.IGNORECASE),
     re.compile(r"\bполис(?:а|ом)?\s+омс\b", re.IGNORECASE),
     re.compile(r"\bномер\s+истории\s+болезни\b", re.IGNORECASE),
@@ -95,6 +96,15 @@ _PATIENT_DATA_PATTERNS = [
     re.compile(r"\bтелефон\s+пациент", re.IGNORECASE),
     re.compile(r"\bадрес\s+пациент", re.IGNORECASE),
     re.compile(r"\bдата\s+рождения\s+пациент", re.IGNORECASE),
+    # Консервативные локальные шаблоны PII. Лучше остановить сообщение,
+    # чем случайно отправить идентификатор во внешний API.
+    re.compile(r"(?<!\d)\d{3}[- ]?\d{3}[- ]?\d{3}[- ]?\d{2}(?!\d)"),  # СНИЛС
+    re.compile(r"(?<!\d)\d{16}(?!\d)"),  # типичный номер полиса ОМС
+    re.compile(r"(?<!\d)\d{4}\s?\d{6}(?!\d)"),  # серия + номер паспорта
+    re.compile(
+        r"(?<!\d)(?:\+7|8)[ -]?(?:\(?\d{3}\)?)[ -]?\d{3}[ -]?\d{2}[ -]?\d{2}(?!\d)"
+    ),
+    re.compile(r"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b", re.IGNORECASE),
 ]
 
 
